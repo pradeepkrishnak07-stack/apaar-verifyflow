@@ -20,6 +20,10 @@ dist-ssr
 # Vercel deployment cache
 .vercel
 
+# Netlify deployment cache
+.netlify
+
+
 # Backups, cache & temporary files
 *.bak
 *.tmp

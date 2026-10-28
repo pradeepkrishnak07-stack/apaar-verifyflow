@@ -947,7 +947,7 @@ export const dbService = {
         normalizeInstitutionCode(c.code) === normCode
     )
 
-    if (college && college.departments && Array.isArray(college.departments) && college.departments.length > 0) {
+    if (college && Array.isArray(college.departments)) {
       return college.departments
     }
 
@@ -961,17 +961,6 @@ export const dbService = {
 
     if (defaults && defaults.length > 0) {
       return defaults
-    }
-
-    // If college exists, fallback to standard technical departments
-    if (college) {
-      return [
-        'Computer Science and Engineering',
-        'Information Technology',
-        'Electronics and Communication Engineering',
-        'Mechanical Engineering',
-        'Civil Engineering',
-      ]
     }
 
     return []

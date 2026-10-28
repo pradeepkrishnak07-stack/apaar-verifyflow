@@ -4,6 +4,10 @@
 > **Problem Statement ID:** SIH26263  
 > **Title:** Development of an APAAR ID-Based Student Data Management and Verification Platform for AICTE-Approved Institutions.  
 > **Category:** Software / Higher Education & Governance  
+> 
+> 🌐 **Live Website URL:** [https://apaar-verifyflow.netlify.app](https://apaar-verifyflow.netlify.app)  
+> 🐙 **GitHub Repository:** [https://github.com/pradeepkrishnak07-stack/apaar-verifyflow](https://github.com/pradeepkrishnak07-stack/apaar-verifyflow)
+  
 
 ---
 
@@ -136,6 +140,17 @@ npm run lint
 ```bash
 npm run preview
 ```
+
+### 7. Netlify Deployment & CI/CD Pipeline
+The project is configured for automated CI/CD deployment on [Netlify](https://www.netlify.com/):
+- **Live URL:** [https://apaar-verifyflow.netlify.app](https://apaar-verifyflow.netlify.app)
+- **Production Branch:** `main`
+- **Build Command:** `npm run build`
+- **Publish Directory:** `dist`
+- **Functions Directory:** `netlify/functions`
+- **SPA Routing:** Configured via `netlify.toml` and `public/_redirects` for 200 client-side route rewrites.
+- **Continuous Deployment:** Any commit pushed to `main` on GitHub triggers an automatic redeploy on Netlify.
+
 
 ---
 
