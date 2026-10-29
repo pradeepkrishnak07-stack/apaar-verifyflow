@@ -665,6 +665,11 @@ export async function handleAuthRequest(
           const matched = collegeDepartments.find((d) => cleanDept(d) === normDept)
           if (matched) {
             finalDepartment = matched
+          } else {
+            sendJson(res, 400, {
+              error: `Invalid department: "${finalDepartment}". Please choose a department configured by ${matchedCollege.name}.`,
+            })
+            return true
           }
         }
       } else {

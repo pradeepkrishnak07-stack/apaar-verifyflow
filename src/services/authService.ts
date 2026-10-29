@@ -86,22 +86,8 @@ export interface RegisterPlatformAdminData {
   invitationCode?: string
 }
 
-interface StoredUserRecord {
-  id: string
-  fullName: string
-  email: string
-  role: 'student' | 'college_admin' | 'platform_admin'
-  password: string
-  apaarId?: string
-  institutionName?: string
-  institutionCode?: string
-  department?: string
-}
-
 const TOKEN_KEY = 'apaar_auth_jwt'
 const SESSION_KEY = 'apaar_auth_session'
-const USERS_STORAGE_KEY = 'apaar_local_users'
-const PROFILES_STORAGE_KEY = 'apaar_local_profiles'
 
 const DEFAULT_COLLEGES = [
   {
@@ -143,68 +129,23 @@ const DEFAULT_COLLEGES = [
     ],
   },
   {
-    id: 'col_vcet_04',
+    id: 'col_1793115697005',
     code: 'AICTE-2026',
     name: 'VELALAR COLLEGE OF ENGINEERING AND TECHNOLOGY',
     state: 'Tamil Nadu',
     departments: [
-      'Computer Science & Engineering',
+      'Computer Science and Engineering',
       'Information Technology',
-      'Electronics & Communication',
+      'Artificial Intelligence and Data Science',
+      'Electronics and Communication Engineering',
+      'Electrical and Electronics Engineering',
+      'Mechanical Engineering',
+      'Civil Engineering',
       'Biomedical Engineering',
+      'Medical Electronics',
     ],
   },
 ]
-
-const DEFAULT_USERS: StoredUserRecord[] = [
-  {
-    id: 'usr_platform_admin_01',
-    fullName: 'Dr. Anil Sahasrabudhe (Central Administration)',
-    email: 'admin@aicte.gov.in',
-    role: 'platform_admin',
-    password: 'Apaar@2026',
-  },
-  {
-    id: 'usr_college_admin_01',
-    fullName: 'Dr. S. K. Kulkarni',
-    email: 'registrar@niet.edu.in',
-    role: 'college_admin',
-    institutionName: 'National Institute of Engineering & Technology',
-    institutionCode: 'NIET-2006-AICTE',
-    password: 'Apaar@2026',
-  },
-  {
-    id: 'usr_student_01',
-    fullName: 'Aarav Sharma',
-    email: 'aarav.sharma@student.niet.edu.in',
-    apaarId: '210420241234',
-    role: 'student',
-    institutionName: 'National Institute of Engineering & Technology',
-    institutionCode: 'NIET-2006-AICTE',
-    department: 'Computer Science & Engineering',
-    password: 'Apaar@2026',
-  },
-]
-
-const DEFAULT_PROFILE: StudentProfileData = {
-  id: 'prof_student_01',
-  userId: 'usr_student_01',
-  apaarId: '210420241234',
-  fullName: 'Aarav Sharma',
-  email: 'aarav.sharma@student.niet.edu.in',
-  institutionName: 'National Institute of Engineering & Technology',
-  institutionCode: 'NIET-2006-AICTE',
-  department: 'Computer Science & Engineering',
-  course: 'B.Tech - Computer Science & Engineering',
-  yearOfStudy: '4th Year (Final Year)',
-  registrationNumber: '2021NIET0841',
-  phone: '+91 98765 43210',
-  dob: '15 Aug 2003',
-  gender: 'Male',
-  bloodGroup: 'B+',
-  digilockerConnected: true,
-  lastSync: new Date().toLocaleString('en-IN'),
-}
 
 class AuthService {
   private token: string | null = null
@@ -251,44 +192,6 @@ class AuthService {
   private setStoredSession(user: AuthUser, profile?: StudentProfileData) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(SESSION_KEY, JSON.stringify({ user, profile }))
-    }
-  }
-
-  private getLocalUsers(): StoredUserRecord[] {
-    if (typeof window === 'undefined') return DEFAULT_USERS
-    try {
-      const stored = localStorage.getItem(USERS_STORAGE_KEY)
-      if (stored) {
-        return JSON.parse(stored)
-      }
-    } catch {
-      // ignore
-    }
-    return [...DEFAULT_USERS]
-  }
-
-  private saveLocalUsers(users: StoredUserRecord[]) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users))
-    }
-  }
-
-  private getLocalProfiles(): StudentProfileData[] {
-    if (typeof window === 'undefined') return [DEFAULT_PROFILE]
-    try {
-      const stored = localStorage.getItem(PROFILES_STORAGE_KEY)
-      if (stored) {
-        return JSON.parse(stored)
-      }
-    } catch {
-      // ignore
-    }
-    return [{ ...DEFAULT_PROFILE }]
-  }
-
-  private saveLocalProfiles(profiles: StudentProfileData[]) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(profiles))
     }
   }
 
@@ -339,69 +242,19 @@ class AuthService {
     portal?: 'student' | 'college_admin' | 'platform_admin',
     securityAnswer?: string
   ): Promise<LoginResponse> {
-    try {
-      const result = await this.request<LoginResponse>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ identifier, password, portal, securityAnswer }),
-      })
+    const result = await this.request<LoginResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, password, portal, securityAnswer }),
+    })
 
-      if (result.token) {
-        this.setToken(result.token)
-        if (result.user) {
-          this.setStoredSession(result.user, result.profile)
-        }
+    if (result.token) {
+      this.setToken(result.token)
+      if (result.user) {
+        this.setStoredSession(result.user, result.profile)
       }
-
-      return result
-    } catch (err: any) {
-      // Check for static/client fallback
-      const cleanIdent = identifier.trim().toLowerCase()
-      const users = this.getLocalUsers()
-      const user = users.find(
-        (u) =>
-          u.email.toLowerCase() === cleanIdent ||
-          (u.apaarId && u.apaarId === identifier.trim())
-      )
-
-      if (user && (user.password === password || password === 'Apaar@2026')) {
-        if (portal && user.role !== portal) {
-          throw new Error(
-            `Account found with role '${user.role}', but you are trying to sign in through '${portal}' portal.`
-          )
-        }
-
-        const token = `demo_jwt_${user.role}_${Date.now()}`
-        const authUser: AuthUser = {
-          id: user.id,
-          fullName: user.fullName,
-          email: user.email,
-          role: user.role,
-          apaarId: user.apaarId,
-          institutionName: user.institutionName,
-          institutionCode: user.institutionCode,
-        }
-
-        let profile: StudentProfileData | undefined
-        if (user.role === 'student') {
-          const profiles = this.getLocalProfiles()
-          profile =
-            profiles.find((p) => p.userId === user.id || p.apaarId === user.apaarId) ||
-            DEFAULT_PROFILE
-        }
-
-        this.setToken(token)
-        this.setStoredSession(authUser, profile)
-
-        return {
-          success: true,
-          token,
-          user: authUser,
-          profile,
-        }
-      }
-
-      throw err
     }
+
+    return result
   }
 
   /**
@@ -427,146 +280,38 @@ class AuthService {
    * Register Student
    */
   public async registerStudent(data: RegisterStudentData): Promise<LoginResponse> {
-    try {
-      const result = await this.request<LoginResponse>('/api/auth/register/student', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      })
+    const result = await this.request<LoginResponse>('/api/auth/register/student', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
 
-      if (result.token) {
-        this.setToken(result.token)
-        if (result.user) {
-          this.setStoredSession(result.user, result.profile)
-        }
-      }
-
-      return result
-    } catch (err: any) {
-      const users = this.getLocalUsers()
-      if (users.some((u) => u.email.toLowerCase() === data.email.trim().toLowerCase())) {
-        throw new Error(`Email ${data.email} is already registered.`)
-      }
-
-      const userId = `usr_std_${Date.now()}`
-      const newUser: StoredUserRecord = {
-        id: userId,
-        fullName: data.fullName.trim(),
-        email: data.email.trim().toLowerCase(),
-        role: 'student',
-        apaarId: data.apaarId.trim(),
-        institutionName: data.institutionName.trim(),
-        institutionCode: data.collegeCode || 'NIET-2006-AICTE',
-        department: data.department || 'Computer Science & Engineering',
-        password: data.password,
-      }
-
-      users.push(newUser)
-      this.saveLocalUsers(users)
-
-      const newProfile: StudentProfileData = {
-        id: `prof_${Date.now()}`,
-        userId,
-        apaarId: data.apaarId.trim(),
-        fullName: data.fullName.trim(),
-        email: data.email.trim().toLowerCase(),
-        institutionName: data.institutionName.trim(),
-        institutionCode: data.collegeCode || 'NIET-2006-AICTE',
-        department: data.department || 'Computer Science & Engineering',
-        course: data.course || 'B.Tech - Computer Science & Engineering',
-        yearOfStudy: data.academicYear || '1st Year',
-        registrationNumber: data.registrationNumber || `REG-${Date.now().toString().slice(-6)}`,
-        phone: '+91 98765 00000',
-        dob: '01 Jan 2004',
-        gender: 'Not Specified',
-        bloodGroup: 'O+',
-        digilockerConnected: false,
-        lastSync: new Date().toLocaleString('en-IN'),
-      }
-
-      const profiles = this.getLocalProfiles()
-      profiles.push(newProfile)
-      this.saveLocalProfiles(profiles)
-
-      const token = `demo_jwt_student_${Date.now()}`
-      const authUser: AuthUser = {
-        id: newUser.id,
-        fullName: newUser.fullName,
-        email: newUser.email,
-        role: newUser.role,
-        apaarId: newUser.apaarId,
-        institutionName: newUser.institutionName,
-        institutionCode: newUser.institutionCode,
-      }
-
-      this.setToken(token)
-      this.setStoredSession(authUser, newProfile)
-
-      return {
-        success: true,
-        token,
-        user: authUser,
-        profile: newProfile,
+    if (result.token) {
+      this.setToken(result.token)
+      if (result.user) {
+        this.setStoredSession(result.user, result.profile)
       }
     }
+
+    return result
   }
 
   /**
    * Register College / Institutional Administrator
    */
   public async registerCollege(data: RegisterCollegeData): Promise<LoginResponse> {
-    try {
-      const result = await this.request<LoginResponse>('/api/auth/register/college', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      })
+    const result = await this.request<LoginResponse>('/api/auth/register/college', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
 
-      if (result.token) {
-        this.setToken(result.token)
-        if (result.user) {
-          this.setStoredSession(result.user)
-        }
-      }
-
-      return result
-    } catch (err: any) {
-      const users = this.getLocalUsers()
-      if (users.some((u) => u.email.toLowerCase() === data.email.trim().toLowerCase())) {
-        throw new Error(`Institutional email ${data.email} is already registered.`)
-      }
-
-      const userId = `usr_col_${Date.now()}`
-      const newUser: StoredUserRecord = {
-        id: userId,
-        fullName: data.fullName.trim(),
-        email: data.email.trim().toLowerCase(),
-        role: 'college_admin',
-        institutionName: data.institutionName.trim(),
-        institutionCode: data.aicteCode.trim(),
-        password: data.password,
-      }
-
-      users.push(newUser)
-      this.saveLocalUsers(users)
-
-      const token = `demo_jwt_college_${Date.now()}`
-      const authUser: AuthUser = {
-        id: newUser.id,
-        fullName: newUser.fullName,
-        email: newUser.email,
-        role: newUser.role,
-        institutionName: newUser.institutionName,
-        institutionCode: newUser.institutionCode,
-      }
-
-      this.setToken(token)
-      this.setStoredSession(authUser)
-
-      return {
-        success: true,
-        token,
-        user: authUser,
+    if (result.token) {
+      this.setToken(result.token)
+      if (result.user) {
+        this.setStoredSession(result.user)
       }
     }
+
+    return result
   }
 
   /**
@@ -729,26 +474,13 @@ class AuthService {
     otp: string,
     newPassword: string
   ): Promise<{ success: boolean; message: string }> {
-    try {
-      return await this.request<{ success: boolean; message: string }>(
-        '/api/auth/reset-password',
-        {
-          method: 'POST',
-          body: JSON.stringify({ email, otp, newPassword }),
-        }
-      )
-    } catch (err: any) {
-      const users = this.getLocalUsers()
-      const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
-      if (user) {
-        user.password = newPassword
-        this.saveLocalUsers(users)
+    return await this.request<{ success: boolean; message: string }>(
+      '/api/auth/reset-password',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, otp, newPassword }),
       }
-      return {
-        success: true,
-        message: 'Password has been reset successfully. Please sign in with your new password.',
-      }
-    }
+    )
   }
 
   /**

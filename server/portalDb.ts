@@ -232,6 +232,23 @@ export function resolveDbFilePath(): string {
 }
 
 let dbCache: DatabaseSchema | null = null
+let dbIsDirty = false
+
+export function isDatabaseDirty(): boolean {
+  return dbIsDirty
+}
+
+export function markDatabaseClean(): void {
+  dbIsDirty = false
+}
+
+export function setCachedDatabase(db: DatabaseSchema): void {
+  dbCache = sanitizeDatabase(db)
+  try {
+    const tmpDbFile = path.join('/tmp', 'auth_database.json')
+    fs.writeFileSync(tmpDbFile, JSON.stringify(dbCache, null, 2), 'utf-8')
+  } catch {}
+}
 
 // Helper for PBKDF2 Password Hashing
 export function hashPassword(password: string): string {
@@ -803,6 +820,7 @@ export function getDatabase(): DatabaseSchema {
 
 export function saveDatabase(db: DatabaseSchema): void {
   dbCache = db
+  dbIsDirty = true
   const jsonStr = JSON.stringify(db, null, 2)
 
   try {
@@ -1019,9 +1037,20 @@ export const dbService = {
     const cleanRegQ = rawQ.replace(/[\s-]+/g, '').toUpperCase()
     const searchType = filters?.searchType || 'all'
 
+    const college = db.colleges.find((c) => c.id === collegeId)
+    const normCode = college ? normalizeInstitutionCode(college.code) : ''
+    const normName = college ? normalizeInstitutionName(college.name) : ''
+
     return db.students.filter((s) => {
-      // 1. Mandatory College Isolation: Student must belong to this college's unique college_id
-      if (s.collegeId !== collegeId) return false
+      // 1. Mandatory College Isolation: Student must belong to this college's unique college_id or canonical code
+      const matchesCollege =
+        s.collegeId === collegeId ||
+        (normCode && s.institutionCode && normalizeInstitutionCode(s.institutionCode) === normCode) ||
+        (normName && s.institutionName && normalizeInstitutionName(s.institutionName) === normName)
+      if (!matchesCollege) return false
+      if (s.collegeId !== collegeId && college) {
+        s.collegeId = college.id
+      }
 
       // 2. Department filter if provided
       if (filters?.department && filters.department !== 'all') {
@@ -1115,7 +1144,19 @@ export const dbService = {
     )
     if (!college) return null
 
-    const students = db.students.filter((s) => s.collegeId === college.id)
+    const normCode = normalizeInstitutionCode(college.code)
+    const normName = normalizeInstitutionName(college.name)
+
+    const students = db.students.filter((s) => {
+      const match =
+        s.collegeId === college.id ||
+        (normCode && s.institutionCode && normalizeInstitutionCode(s.institutionCode) === normCode) ||
+        (normName && s.institutionName && normalizeInstitutionName(s.institutionName) === normName)
+      if (match && s.collegeId !== college.id) {
+        s.collegeId = college.id
+      }
+      return match
+    })
     const academicRecords = db.academicRecords.filter((r) => r.collegeId === college.id)
     const documents = db.documents.filter((d) => d.collegeId === college.id)
     const verificationRequests = db.verificationRequests.filter((v) => v.collegeId === college.id)

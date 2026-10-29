@@ -182,6 +182,8 @@ export const Register: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   /* ---- Student-specific fields --------------------------------------- */
+  const [studentDepartment, setStudentDepartment] = useState('')
+  const [collegeDepartments, setCollegeDepartments] = useState<string[]>([])
   const [apaarId, setApaarId] = useState('')
   const [course, setCourse] = useState('B.Tech — Undergraduate Programme')
   const [registrationNumber, setRegistrationNumber] = useState('')
@@ -266,6 +268,8 @@ export const Register: React.FC = () => {
     setInstitutionName('')
     setSelectedCollegeId('')
     setCollegeCode('')
+    setStudentDepartment('')
+    setCollegeDepartments([])
     setApaarId('')
     setCourse('B.Tech — Undergraduate Programme')
     setRegistrationNumber('')
@@ -351,6 +355,9 @@ export const Register: React.FC = () => {
           errs.collegeCode = 'AICTE / Institution identifier is required to link with your college portal'
         }
       }
+      if (!studentDepartment.trim()) {
+        errs.department = 'Please select or specify your academic department'
+      }
     } else if (selectedPortal === 'college_admin') {
       const instVal = validateRequired(institutionName, 'Institution name')
       if (!instVal.isValid) errs.institutionName = instVal.error!
@@ -434,6 +441,7 @@ export const Register: React.FC = () => {
           institutionName,
           collegeId: selectedCollegeId && selectedCollegeId !== 'other' ? selectedCollegeId : undefined,
           collegeCode: collegeCode.trim() || undefined,
+          department: studentDepartment.trim() || undefined,
           apaarId,
           password,
           course,
@@ -1016,19 +1024,35 @@ export const Register: React.FC = () => {
                           onChange={(e) => {
                             const val = e.target.value
                             setSelectedCollegeId(val)
+                            setStudentDepartment('')
                             const found = collegesList.find((c) => c.id === val)
                             if (found) {
                               setInstitutionName(found.name)
                               setCollegeCode(found.code)
+                              if (Array.isArray(found.departments) && found.departments.length > 0) {
+                                setCollegeDepartments(found.departments)
+                              } else {
+                                authService.getCollegeDepartments(found.id).then((depts) => {
+                                  setCollegeDepartments(depts)
+                                }).catch(() => {
+                                  setCollegeDepartments([])
+                                })
+                              }
                             } else if (val !== 'other') {
                               setInstitutionName('')
                               setCollegeCode('')
+                              setCollegeDepartments([])
+                            } else {
+                              setCollegeDepartments([])
                             }
                             if (errors.institutionName) {
                               setErrors((p) => ({ ...p, institutionName: undefined }))
                             }
                             if (errors.collegeCode) {
                               setErrors((p) => ({ ...p, collegeCode: undefined }))
+                            }
+                            if (errors.department) {
+                              setErrors((p) => ({ ...p, department: undefined }))
                             }
                           }}
                           className={`w-full rounded-xl border ${
@@ -1105,6 +1129,64 @@ export const Register: React.FC = () => {
                       error={errors.institutionName}
                       leftIcon={<Building2 size={16} />}
                     />
+                  )}
+
+                  {/* Academic Department — Student only */}
+                  {selectedPortal === 'student' && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label
+                          className="block text-xs font-semibold text-slate-700"
+                          htmlFor="reg-student-department"
+                        >
+                          Academic Department <span className="text-red-500">*</span>
+                        </label>
+                        {selectedCollegeId && selectedCollegeId !== 'other' && collegeDepartments.length === 0 && (
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            Enter enrolled department manually
+                          </span>
+                        )}
+                      </div>
+
+                      {selectedCollegeId && selectedCollegeId !== 'other' && collegeDepartments.length > 0 ? (
+                        <select
+                          id="reg-student-department"
+                          value={studentDepartment}
+                          onChange={(e) => {
+                            setStudentDepartment(e.target.value)
+                            if (errors.department) setErrors((p) => ({ ...p, department: undefined }))
+                          }}
+                          className={`w-full rounded-xl border ${
+                            errors.department ? 'border-red-400 bg-red-50/20' : 'border-slate-300 bg-white'
+                          } px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all font-medium`}
+                          required
+                        >
+                          <option value="">-- Select Your Enrolled Department --</option>
+                          {collegeDepartments.map((dept) => (
+                            <option key={dept} value={dept}>
+                              {dept}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          id="reg-student-department"
+                          value={studentDepartment}
+                          onChange={(e) => {
+                            setStudentDepartment(e.target.value)
+                            if (errors.department) setErrors((p) => ({ ...p, department: undefined }))
+                          }}
+                          placeholder="e.g. Computer Science and Engineering"
+                          error={errors.department}
+                          required
+                        />
+                      )}
+                      {errors.department && selectedCollegeId && selectedCollegeId !== 'other' && collegeDepartments.length > 0 && (
+                        <p className="mt-1 text-[11px] text-red-600 font-medium">
+                          {errors.department}
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {/* College Registration Number — Student only */}

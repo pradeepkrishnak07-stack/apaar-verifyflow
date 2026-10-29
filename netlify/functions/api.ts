@@ -1,5 +1,53 @@
 import { Readable } from 'node:stream'
 import { handleAuthRequest } from '../../server/authBackend.ts'
+import {
+  getDatabase,
+  setCachedDatabase,
+  isDatabaseDirty,
+  markDatabaseClean,
+} from '../../server/portalDb.ts'
+import { connectLambda, getStore } from '@netlify/blobs'
+
+const BLOB_STORE_NAME = 'apaar-verifyflow-db'
+const BLOB_DB_KEY = 'auth_database.json'
+
+async function syncFromBlobStore(event: any): Promise<void> {
+  if (event?.blobs) {
+    try {
+      connectLambda(event)
+    } catch (e: any) {
+      console.warn('connectLambda note:', e?.message)
+    }
+  }
+
+  try {
+    const store = getStore(BLOB_STORE_NAME)
+    const remoteDb = await store.get(BLOB_DB_KEY, { type: 'json' })
+    if (remoteDb && (remoteDb as any).colleges && (remoteDb as any).students) {
+      setCachedDatabase(remoteDb as any)
+      markDatabaseClean()
+    } else {
+      // First run: seed remote store with current bundled database
+      const currentDb = getDatabase()
+      await store.setJSON(BLOB_DB_KEY, currentDb)
+      markDatabaseClean()
+    }
+  } catch {
+    // If running in environment without Blobs context, continue with local storage
+  }
+}
+
+async function persistToBlobStore(): Promise<void> {
+  if (!isDatabaseDirty()) return
+  try {
+    const store = getStore(BLOB_STORE_NAME)
+    const currentDb = getDatabase()
+    await store.setJSON(BLOB_DB_KEY, currentDb)
+    markDatabaseClean()
+  } catch (err: any) {
+    console.warn('persistToBlobStore warning:', err?.message)
+  }
+}
 
 export const handler = async (event: any, _context: any) => {
   // Handle CORS Preflight immediately
@@ -72,7 +120,15 @@ export const handler = async (event: any, _context: any) => {
   }
 
   try {
+    // 1. Sync database state from persistent remote store if available
+    await syncFromBlobStore(event)
+
+    // 2. Handle API request
     const handled = await handleAuthRequest(req, res)
+
+    // 3. Persist modifications back to remote store if dirty
+    await persistToBlobStore()
+
     if (!handled) {
       return {
         statusCode: 404,

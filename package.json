@@ -12,6 +12,7 @@
     "admin:provision": "node --experimental-strip-types server/provision_admin.ts"
   },
   "dependencies": {
+    "@netlify/blobs": "^11.1.7",
     "@tailwindcss/vite": "^4.3.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.61.0",
